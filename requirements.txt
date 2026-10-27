@@ -1,0 +1,9 @@
+# Python 3.12。数字はすべてこの版で確かめた(2026-10-07 固定)。src/env.py は標準ライブラリだけで動く。
+requests==2.34.2
+numpy==2.2.6
+pandas==2.2.3
+pyarrow==25.0.1
+duckdb==1.5.6
+scikit-learn==1.6.1
+scipy==1.14.1
+matplotlib==3.10.8

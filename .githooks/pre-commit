@@ -1,0 +1,44 @@
+#!/bin/sh
+# 秘密情報のコミットを止める。有効化: sh scripts/setup.sh(git config core.hooksPath .githooks)
+# 誤検知で止まったときだけ、中身を確認したうえで git commit --no-verify を使う。
+
+status=0
+
+# 1) ファイル名で止める(-z で空白・日本語パスも引用符なしで受け取る)
+blocked=$(git diff --cached --name-only -z --diff-filter=ACMR | tr '\0' '\n' | while IFS= read -r f; do
+  base=${f##*/}
+  case "$base" in
+    .env.example) ;;
+    .env|.env.*|.envrc|.netrc|kaggle.json|*.pem|*.key) printf '%s\n' "$f" ;;
+  esac
+done)
+if [ -n "$blocked" ]; then
+  echo "pre-commit: 秘密情報のファイルはコミットできません:" >&2
+  printf '  %s\n' "$blocked" >&2
+  status=1
+fi
+
+# 2) 追加行の中身で止める
+#    - 値の入った KEY=... / KEY: ... / os.environ["KEY"] = "..." / ipynb の \"...\" 形式
+#    - トークン形式(Kaggle KGAT_ / HF hf_ / Anthropic sk-ant- / OpenAI sk-)
+#    - kaggle.json の中身("key": "<32桁hex>")
+keys='KAGGLE_API_TOKEN|KAGGLE_KEY|HF_TOKEN|WANDB_API_KEY|SIGNATE_TOKEN|SIGNETE_USER|SIGNETE_PASS|ZINDI_USR|ZINDI_PASSWORD|ANTHROPIC_API_KEY|OPENAI_API_KEY'
+# パスワードは記号を含みうるので、空白・引用符以外の任意文字で検出する(require(...) 等の呼び出しは除く)
+passkeys='SIGNETE_PASS|ZINDI_PASSWORD'
+pattern="($keys)[]\"'\\\\]*[[:space:]]*[=:][[:space:]]*\\\\?[\"']?[A-Za-z0-9_-]{8,}|($passkeys)[]\"'\\\\]*[[:space:]]*[=:][[:space:]]*\\\\?[\"']?[^[:space:]\"'\\\\(]{6,}([[:space:]\"'\\\\]|\$)|KGAT_[A-Za-z0-9]{16,}|hf_[A-Za-z0-9]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{32,}|\"key\"[[:space:]]*:[[:space:]]*\"[0-9a-f]{32}\""
+# プレースホルダ(説明文の例)は除外する
+# (広く取りすぎると本物を見逃すので、明らかな例示語だけに絞る)
+placeholder='[=:][[:space:]]*\\?["'"'"']?(your_|your-|<[a-z_-]*>|xxxx|placeholder|changeme|dummy)'
+
+hits=$(git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude).env.example' \
+  | grep -E '^\+' | grep -v -E '^\+\+\+' | grep -E "$pattern" | grep -v -iE "$placeholder")
+if [ -n "$hits" ]; then
+  echo "pre-commit: APIキーらしき文字列が含まれています(値は .env にだけ書く):" >&2
+  # パスワードは記号を含みうるので先に値全体を伏せる
+  echo "$hits" \
+    | sed -E 's/(('"$passkeys"')[]"'"'"'\\]*[[:space:]]*[=:][[:space:]]*\\?["'"'"']?)[^[:space:]"'"'"'\\]+/\1********/g' \
+    | sed -E 's/(KGAT_|hf_|sk-ant-|sk-|[=:][[:space:]]*\\?["'"'"']?)([A-Za-z0-9_-]{4})[A-Za-z0-9_-]+/\1\2********/g' >&2
+  status=1
+fi
+
+exit $status

@@ -1,0 +1,46 @@
+# ---- 秘密情報(絶対にコミットしない) ----
+.env
+.env.*
+!.env.example
+.envrc
+.netrc
+kaggle.json
+*.pem
+*.key
+secrets/
+
+# ---- データ・生成物(再取得・再生成できるもの) ----
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+submissions/*
+!submissions/.gitkeep
+replays/
+outputs/
+checkpoints/
+wandb/
+*.tar.gz
+*.zip
+*.ckpt
+*.pt
+*.pth
+*.onnx
+
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+
+# ---- 作業用 ----
+scratchpad/
+*.log
+!reports/*.log
+.DS_Store
+Thumbs.db
+
+# 他参加者のスレッドの数値を含む分析メモ(公開しない)
+docs/fable_hypotheses_20261018.md
